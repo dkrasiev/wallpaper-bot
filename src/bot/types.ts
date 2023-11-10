@@ -7,7 +7,10 @@ export interface WallpaperSize {
 }
 
 export interface MySession {
-  wallpaperSize: WallpaperSize
+  config: {
+    wallpaperSize: WallpaperSize
+    backgroundColor?: number
+  }
 }
 
 export type MyContext = FileFlavor<Context> & SessionFlavor<MySession>

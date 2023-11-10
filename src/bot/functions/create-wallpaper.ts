@@ -5,8 +5,9 @@ import { WallpaperSize } from '../types'
 export async function createWallpaper(
   image: Jimp,
   { width, height }: WallpaperSize,
+  backgroundColor?: number,
 ): Promise<Jimp> {
-  const color = await averageColor(image)
+  const color = backgroundColor ?? averageColor(image)
 
   const canvas = new Jimp(width, height, color)
   const padding = Math.floor(canvas.getWidth() * 0.1)
@@ -25,6 +26,6 @@ export async function createWallpaper(
   return canvas
 }
 
-async function averageColor(image: Jimp): Promise<number> {
-  return await image.clone().resize(1, 1).getPixelColor(0, 0)
+function averageColor(image: Jimp): number {
+  return image.clone().resize(1, 1).getPixelColor(0, 0)
 }
