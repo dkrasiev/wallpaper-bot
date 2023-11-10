@@ -43,16 +43,27 @@ bot.command('wallpaper', async (ctx) => {
   }
 })
 
-bot.on('message:photo', async (ctx) => {
-  const photo = ctx.message.photo.at(-1)
+bot.on(['message:photo', 'message:document'], async (ctx) => {
+  let imageId: string
 
-  if (!photo) {
-    await ctx.reply('Photo is empty')
+  if (ctx.message.photo) {
+    imageId = ctx.message.photo.at(-1)?.file_id
+  } else if (ctx.message.document) {
+    if (ctx.message.document.mime_type?.includes('image')) {
+      imageId = ctx.message.document.file_id
+    } else {
+      await ctx.reply('Document is not an image')
+    }
+  } else {
+    await ctx.reply('Photo not found')
+  }
+
+  if (!imageId) {
     return
   }
 
   const image = await bot.api
-    .getFile(photo.file_id)
+    .getFile(imageId)
     .then((file) => file.download())
     .then((path) => Jimp.create(path))
   const wallpaper = await createWallpaper(image, {
