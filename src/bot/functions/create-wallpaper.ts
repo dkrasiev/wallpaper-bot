@@ -6,7 +6,9 @@ export async function createWallpaper(
   image: Jimp,
   { width, height }: WallpaperSize,
 ): Promise<Jimp> {
-  const canvas = await createJimp(width, height)
+  const color = await averageColor(image)
+
+  const canvas = new Jimp(width, height, color)
   const padding = Math.floor(canvas.getWidth() * 0.1)
 
   canvas.composite(
@@ -23,18 +25,6 @@ export async function createWallpaper(
   return canvas
 }
 
-async function createJimp(
-  w: number,
-  h: number,
-  background: number = 0x000000ff,
-): Promise<Jimp> {
-  return new Promise((resolve) => {
-    new Jimp(w, h, background, (err, jimp) => {
-      if (err) {
-        throw err
-      }
-
-      resolve(jimp)
-    })
-  })
+async function averageColor(image: Jimp): Promise<number> {
+  return await image.clone().resize(1, 1).getPixelColor(0, 0)
 }
