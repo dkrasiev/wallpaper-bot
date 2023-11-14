@@ -1,6 +1,6 @@
 declare module 'colorinterpreter' {
   class Color {
-    constructor(input: string): this
+    constructor(input: string)
     toHEX(): string
     toHEXA(): string
   }
