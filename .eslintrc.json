@@ -1,8 +1,12 @@
 {
   "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
   "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  },
   "plugins": ["@typescript-eslint", "simple-import-sort", "prettier"],
   "rules": {
+    "@typescript-eslint/no-floating-promises": "error",
     "simple-import-sort/imports": "warn",
     "simple-import-sort/exports": "warn",
     "prettier/prettier": "warn"
