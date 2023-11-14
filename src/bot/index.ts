@@ -1,69 +1,82 @@
+import { conversations, createConversation } from '@grammyjs/conversations'
 import { hydrateFiles } from '@grammyjs/files'
-import { Bot, InputFile, InputMediaBuilder, session } from 'grammy'
+import { RedisAdapter } from '@grammyjs/storage-redis'
+import {
+  Bot,
+  InlineKeyboard,
+  InputFile,
+  InputMediaBuilder,
+  session,
+} from 'grammy'
 import Jimp from 'jimp'
 
 import { ENV } from '../config'
-import { createWallpaper, parseWallpaperSize } from './functions'
-import { parseColor } from './functions/parse-color'
-import { redisStorage } from './storage'
-import { MyApi, MyContext } from './types'
-import { trimCommand } from './utils/trim-command'
+import { redis } from '../frameworks/ioredis'
+import { updateBackgroundColor, updateWallpaperSize } from './conversations'
+import {
+  BotCommand,
+  ConversationId,
+  MyApi,
+  MyContext,
+  MySession,
+  QueryData,
+} from './types'
+import { createWallpaper, numToHex } from './utils'
 
 export const bot = new Bot<MyContext, MyApi>(ENV.BOT_TOKEN)
 
-bot.api.setMyCommands([
+await bot.api.setMyCommands([
   {
-    command: 'start',
+    command: BotCommand.START,
     description: 'start',
   },
   {
-    command: 'help',
+    command: BotCommand.HELP,
     description: 'get help',
   },
   {
-    command: 'wallpaper',
-    description: 'set wallpaper size',
-  },
-  {
-    command: 'color',
-    description: 'set background color',
+    command: BotCommand.CONFIG,
+    description: 'config your wallpaper',
   },
 ])
 
 bot.api.config.use(hydrateFiles(bot.token))
 
+function initial(): MySession {
+  return {
+    config: {
+      wallpaperSize: {
+        width: 111,
+        height: 111,
+      },
+    },
+  }
+}
 bot.use(
   session({
-    initial: () => ({
-      config: {
-        wallpaperSize: {
-          width: 1080,
-          height: 1920,
-        },
-      },
+    initial,
+    storage: new RedisAdapter<MySession>({
+      instance: redis,
     }),
-    storage: redisStorage,
   }),
 )
+bot.use(conversations())
 
-// bot.use(async (ctx, next) => {
-//   ctx.session = {
-//     config: {
-//       wallpaperSize: {
-//         width: 1080,
-//         height: 2400,
-//       },
-//     },
-//   }
-//
-//   await next()
-// })
+bot.use(
+  createConversation(updateBackgroundColor, ConversationId.BACKGROUND_COLOR),
+)
+bot.use(createConversation(updateWallpaperSize, ConversationId.WALLPAPER_SIZE))
 
-bot.command('start', async (ctx) => {
+bot.use(async (ctx, next) => {
+  console.log(ctx.message)
+  await next()
+})
+
+bot.command(BotCommand.START, async (ctx) => {
   await ctx.reply('Hi! Try /help')
 })
 
-bot.command('help', async (ctx) => {
+bot.command(BotCommand.HELP, async (ctx) => {
   await ctx.reply(
     [
       'Try /wallpaper command to set wallpaper size in format WIDTHxHEIGHT (example: 1080x1920)',
@@ -73,39 +86,47 @@ bot.command('help', async (ctx) => {
   )
 })
 
-bot.command('wallpaper', async (ctx) => {
-  try {
-    if (!ctx.message) {
-      return
-    }
-    const wallpaperSize = parseWallpaperSize(ctx.message.text.split(' ')[1])
-    ctx.session.config.wallpaperSize = wallpaperSize
-    await ctx.reply(
-      'Current set: ' + `${wallpaperSize.width}x${wallpaperSize.height}`,
+bot.command(BotCommand.CONFIG, async (ctx) => {
+  let reply_markup = new InlineKeyboard()
+    .text('Configure wallpaper size', QueryData.WALLPAPER_SIZE_CONFIG)
+    .row()
+    .text('Configure background color', QueryData.BACKGROUND_COLOR_CONFIG)
+
+  if (ctx.session.config.backgroundColor) {
+    reply_markup = reply_markup.text(
+      'Use dynamic color',
+      QueryData.BACKGROUND_COLOR_RESET,
     )
-  } catch {
-    await ctx.reply('Invalid size')
   }
+
+  const { wallpaperSize, backgroundColor } = ctx.session.config
+  const text = [
+    'Your config:',
+    `Wallpaper size: ${wallpaperSize.width}x${wallpaperSize.height}`,
+    `Background color: ${
+      backgroundColor ? numToHex(backgroundColor) : 'dynamic'
+    }`,
+  ].join('\n')
+
+  await ctx.reply(text, { reply_markup })
 })
 
-bot.command('color', async (ctx) => {
-  try {
-    if (!ctx.message) {
-      return
-    }
-    const input = trimCommand(ctx.message.text)
-    if (!input) {
-      throw new Error('Invalid color')
-    }
-    const backgroundColor = parseColor(input)
-    ctx.session.config.backgroundColor = backgroundColor
-    await ctx.reply(`Current color: ${input} (${backgroundColor})`)
-  } catch {
-    ctx.session.config.backgroundColor = undefined
-    await ctx.reply(
-      "Reset color, image's average color will be used as a background color",
-    )
-  }
+bot.callbackQuery(QueryData.WALLPAPER_SIZE_CONFIG, async (ctx) => {
+  await ctx.conversation.exit()
+  await ctx.answerCallbackQuery()
+  await ctx.conversation.enter(ConversationId.WALLPAPER_SIZE)
+})
+bot.callbackQuery(QueryData.BACKGROUND_COLOR_CONFIG, async (ctx) => {
+  await ctx.conversation.exit()
+  await ctx.answerCallbackQuery()
+  await ctx.conversation.enter(ConversationId.BACKGROUND_COLOR)
+})
+bot.callbackQuery(QueryData.BACKGROUND_COLOR_RESET, async (ctx) => {
+  ctx.session.config.backgroundColor = undefined
+  await ctx.reply(
+    "Reset color, image's average color will be used as a background color",
+  )
+  await ctx.answerCallbackQuery()
 })
 
 bot.on(['message:photo', 'message:document'], async (ctx) => {
@@ -127,23 +148,39 @@ bot.on(['message:photo', 'message:document'], async (ctx) => {
     return
   }
 
+  await ctx.reply('Processing...')
   const image = await bot.api
     .getFile(imageId)
     .then((file) => file.download())
     .then((path) => Jimp.create(path))
   const { wallpaperSize, backgroundColor } = ctx.session.config
-  const wallpaper = await createWallpaper(
-    image,
-    {
-      ...wallpaperSize,
-    },
-    backgroundColor,
-  )
 
-  // send file in media
+  const lockScreenWallpaper = await createWallpaper({
+    image,
+    size: wallpaperSize,
+    backgroundColor,
+    top: false,
+  })
+  const homeScreenWallpaper = await createWallpaper({
+    image,
+    size: wallpaperSize,
+    backgroundColor,
+    top: true,
+  })
+
+  // send files in media group
   await ctx.replyWithMediaGroup([
     InputMediaBuilder.document(
-      new InputFile(await wallpaper.getBufferAsync('image/png'), 'result.png'),
+      new InputFile(
+        await lockScreenWallpaper.getBufferAsync('image/png'),
+        'lockscreen.png',
+      ),
+    ),
+    InputMediaBuilder.document(
+      new InputFile(
+        await homeScreenWallpaper.getBufferAsync('image/png'),
+        'homescreen.png',
+      ),
     ),
   ])
 })
