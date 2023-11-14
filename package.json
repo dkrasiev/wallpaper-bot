@@ -10,6 +10,7 @@
   "dependencies": {
     "@grammyjs/conversations": "^1.1.2",
     "@grammyjs/files": "^1.0.4",
+    "@grammyjs/runner": "^2.0.3",
     "@grammyjs/storage-redis": "^2.4.0",
     "@typescript-eslint/parser": "^6.10.0",
     "colorinterpreter": "^1.0.5",

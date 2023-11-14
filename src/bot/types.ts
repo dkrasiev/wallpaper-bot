@@ -12,6 +12,9 @@ export interface MySession {
     wallpaperSize: WallpaperSize
     backgroundColor?: number
   }
+  state: {
+    isProcessing: boolean
+  }
 }
 
 export type MyContext = FileFlavor<Context> &
