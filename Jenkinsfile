@@ -4,20 +4,26 @@ pipeline {
     }
 
     stages {
-        stage('Install dependencies') {
-            steps {
-                sh 'npm install --global pnpm'
-                sh 'pnpm install'
-            }
-        }
+        // stage('Install dependencies') {
+        //     steps {
+        //         sh 'npm install --global pnpm'
+        //         sh 'pnpm install'
+        //     }
+        // }
         // stage('Lint') {
         //     steps {
         //         sh 'npm run lint'
         //     }
         // }
-        stage('Build') {
+        // stage('Build') {
+        //     steps {
+        //         sh 'npm run build'
+        //     }
+        // }
+        stage('Build docker') {
             steps {
-                sh 'npm run build'
+                sh 'docker build -t dmitrj/wallpaper-bot .'
+                sh 'docker push dkrasiev/wallpaper-bot'
             }
         }
     }
