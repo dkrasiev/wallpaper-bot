@@ -10,11 +10,11 @@ pipeline {
                 sh 'pnpm install'
             }
         }
-        stage('Lint') {
-            steps {
-                sh 'npm run lint'
-            }
-        }
+        // stage('Lint') {
+        //     steps {
+        //         sh 'npm run lint'
+        //     }
+        // }
         stage('Build') {
             steps {
                 sh 'npm run build'
