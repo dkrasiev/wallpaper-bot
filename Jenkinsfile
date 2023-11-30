@@ -22,8 +22,11 @@ pipeline {
         // }
         stage('Build docker') {
             steps {
-                sh 'docker build -t dmitrj/wallpaper-bot .'
-                sh 'docker push dkrasiev/wallpaper-bot'
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub_token') {
+                        docker.build('dkrasiev/wallpaper-bot:latest').push()
+                    }
+                }
             }
         }
     }
