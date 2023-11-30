@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    // agent {
+    //     docker { image 'node:18-alpine' }
+    // }
 
     stages {
         // stage('Install dependencies') {
@@ -21,7 +24,7 @@ pipeline {
         stage('Build docker') {
             steps {
                 script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub_token') {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
                         docker.build('dkrasiev/wallpaper-bot:latest').push()
                     }
                 }
